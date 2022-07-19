@@ -45,9 +45,14 @@ function parse_notifications(obj) {
 let notifier = require("node-notifier");
 function notify(obj) {
 	console.log("New notification");
+	let title = obj.title;
+	if (obj.app_name && obj.app_name != "") {
+		title = obj.app_name + " - " + title;
+	}
+
 	notifier.notify({
+		title: title,
 		icon: obj.icon,
-		title: obj.title,
 		message: obj.text,
 		sub_title: obj.sub_title
 	})
