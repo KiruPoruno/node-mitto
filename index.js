@@ -10,6 +10,9 @@ const opts = require("minimist")(process.argv.slice(2), {
 	integer: [
 		"frequency",
 		"alive-time",
+	],
+	boolean: [
+		"same-ip-only",
 	]
 });
 
@@ -24,6 +27,7 @@ Server side only
  --cert            path to SSL certificate
  --port            port of the server
  --alive-time      how long a notification will exist for, in seconds
+ --same-ip-only    only returns notifications on the same external IP
 
 Client side only
  --listen          client side daemon
@@ -105,6 +109,11 @@ let get_id = () => {
 	return tmp_id;
 }
 
+let get_ip = (req) => {
+	return req.connection.remoteAddress || 
+		req.ip || req.headers["x-forwarded-for"];
+}
+
 let auth_text = Buffer.from(opts["auth-user"] + ":" + opts["auth-pass"]).toString("base64");
 let check_auth = (auth_header) => {
 	if (! opts["auth-user"] || ! opts["auth-pass"]) {
@@ -142,8 +151,14 @@ app.post("/new-notification", (req, res) => {
 		title: notification.title,
 		app_name: notification.app_name,
 		sub_text: notification.sub_text,
-		sub_title: notification.sub_text
+		sub_title: notification.sub_text,
 	}
+
+	if (opts["same-ip-only"]) {
+		notifications[id].ip = get_ip(req);
+	}
+
+	console.log(notifications)
 
 	setTimeout(() => {
 		delete notifications[id];
@@ -158,6 +173,20 @@ app.get("/notifications", (req, res) => {
 		res.statusCode = 403;
 		console.log("no")
 		return res.send();
+	}
+
+	if (opts["same-ip-only"]) {
+		let new_notifications = {};
+		for (let i in notifications) {
+			if (notifications[i].ip == get_ip(req)) {
+				new_notifications[i] = notifications[i];
+				delete new_notifications[i].ip;
+			}
+
+		}
+
+		res.statusCode = 200;
+		return res.send(new_notifications);
 	}
 
 	res.statusCode = 200;
