@@ -2,7 +2,6 @@ const fs = require("fs");
 const { join } = require("path");
 const opts = require("minimist")(process.argv.slice(2), {
 	string: [
-		"dir",
 		"port",
 		"auth-user",
 		"auth-pass",
