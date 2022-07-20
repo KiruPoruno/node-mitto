@@ -10,14 +10,22 @@ const opts = require("minimist")(process.argv.slice(2), {
 	integer: [
 		"frequency",
 		"alive-time",
+		"rate-limit",
+		"rate-duration",
 	],
 	boolean: [
 		"same-ip-only",
-	]
+	],
+	default: {
+		"frequency": 3,
+		"alive-time": 10,
+		"rate-limit": 100,
+		"rate-duration": 60
+	}
 });
 
 if (opts["help"]) {
-	console.log(`Command Line Arguments
+	console.log(`General
  --help            displays this message
  --auth-user       required user in auth header
  --auth-pass       required pass in auth header
@@ -28,6 +36,8 @@ Server side only
  --port            port of the server
  --alive-time      how long a notification will exist for, in seconds
  --same-ip-only    only returns notifications on the same external IP
+ --rate-limit      how many requests can be made before rate limiting
+ --rate-duration   how long will the rate limit last
 
 Client side only
  --listen          client side daemon
@@ -85,16 +95,28 @@ if (opts["listen"]) {
 				console.log("Unknown error");
 			}
 		})
-	}, opts["frequency"]*1000 || 3000)
+	}, opts["frequency"]*1000)
 
 	return
 }
 
 const express = require("express");
 const parser = require("body-parser");
+const rate_limiter = require("express-rate-limit");
 
 const app = express();
 app.use(parser.json());
+
+console.log(opts["rate-limit"])
+console.log(opts["rate-duration"]*1000)
+const rate_limit = rate_limiter({
+	max: opts["rate-limit"],
+	windowMs: opts["rate-duration"]*1000
+})
+
+if (opts["rate-limit"] > 0) {
+	app.use(rate_limit);
+}
 
 let used_ids = [];
 let notifications = {};
@@ -158,11 +180,9 @@ app.post("/new-notification", (req, res) => {
 		notifications[id].ip = get_ip(req);
 	}
 
-	console.log(notifications)
-
 	setTimeout(() => {
 		delete notifications[id];
-	}, opts["alive-time"]*1000 || 10000)
+	}, opts["alive-time"]*1000)
 
 	res.statusCode = 200;
 	return res.send();
