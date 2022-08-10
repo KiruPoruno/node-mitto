@@ -84,14 +84,17 @@ if (opts["listen"]) {
 		}).then((res) => {
 			parse_notifications(res.data);
 		}).catch((err) => {
+			console.log(err);
 			try {
 				if (err.response.status == 403) {
 					console.log("Forbidden, make sure to have set --auth-* arguments");
 				} else {
 					console.log("Unknown error");
+					console.log(err);
 				}
 			}catch(err) {
 				console.log("Unknown error");
+				console.log(err);
 			}
 		})
 	}, opts["frequency"]*1000)
@@ -106,8 +109,6 @@ const rate_limiter = require("express-rate-limit");
 const app = express();
 app.use(parser.json());
 
-console.log(opts["rate-limit"])
-console.log(opts["rate-duration"]*1000)
 const rate_limit = rate_limiter({
 	max: opts["rate-limit"],
 	windowMs: opts["rate-duration"]*1000
@@ -190,7 +191,6 @@ app.post("/new-notification", (req, res) => {
 app.get("/notifications", (req, res) => {
 	if (! check_auth(req.headers.authorization)) {
 		res.statusCode = 403;
-		console.log("no")
 		return res.send();
 	}
 
@@ -201,7 +201,6 @@ app.get("/notifications", (req, res) => {
 				new_notifications[i] = notifications[i];
 				delete new_notifications[i].ip;
 			}
-
 		}
 
 		res.statusCode = 200;
