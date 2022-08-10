@@ -198,7 +198,7 @@ app.get("/notifications", (req, res) => {
 		let new_notifications = {};
 		for (let i in notifications) {
 			if (notifications[i].ip == get_ip(req)) {
-				new_notifications[i] = notifications[i];
+				new_notifications[i] = {...notifications[i]};
 				delete new_notifications[i].ip;
 			}
 		}
