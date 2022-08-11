@@ -14,12 +14,14 @@ const opts = require("minimist")(process.argv.slice(2), {
 	],
 	boolean: [
 		"same-ip-only",
+		"x-forward-ip"
 	],
 	default: {
 		"frequency": 3,
 		"alive-time": 10,
 		"rate-limit": 100,
-		"rate-duration": 60
+		"rate-duration": 60,
+		"x-forward-ip": false
 	}
 });
 
@@ -37,6 +39,12 @@ Server side only
  --same-ip-only    only returns notifications on the same external IP
  --rate-limit      how many requests can be made before rate limiting
  --rate-duration   how long will the rate limit last
+ --x-forward-ip
+                   enables the X-Forwarded-From header which may be
+                   needed for proxies, as this can be overwritten by the
+                   client, if not needed it should not be enabled, as a
+                   client may pretend to have a different IP, allowing
+                   them to see different notifications
 
 Client side only
  --listen          client side daemon
@@ -132,8 +140,16 @@ let get_id = () => {
 }
 
 let get_ip = (req) => {
-	return req.connection.remoteAddress || 
-		req.ip || req.headers["x-forwarded-for"];
+	if (req.headers["x-forwarded-for"]) {
+		req.headers["x-forwarded-for"] = req.headers["x-forwarded-for"].split(", ")[0];
+	}
+
+	if (! opts["x-forward-ip"]) {
+		req.headers["x-forwarded-for"] = false;
+	}
+
+	return req.headers["x-forwarded-for"] ||
+		req.connection.remoteAddress || req.ip;
 }
 
 let auth_text = Buffer.from(opts["auth-user"] + ":" + opts["auth-pass"]).toString("base64");
@@ -198,6 +214,7 @@ app.get("/notifications", (req, res) => {
 		let new_notifications = {};
 		for (let i in notifications) {
 			if (notifications[i].ip == get_ip(req)) {
+				console.log(notifications[i].ip)
 				new_notifications[i] = {...notifications[i]};
 				delete new_notifications[i].ip;
 			}
