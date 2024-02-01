@@ -20,6 +20,7 @@ current notifications. Seen below:
 		"icon": "",
 		"text": "",
 		"title": "",
+		"app_id": "",
 		"app_name": "",
 		"sub_text": "",
 		"sub_title": ""
@@ -54,15 +55,16 @@ But default values are also displayed below.
 
 #### Global options
 
-| Option      | Description | Default |
-|-------------|-------------|---------|
-| `--auth-user` | Required username | not set |
-| `--auth-pass` | Required password | not set |
+| Option        | Description | Default |
+|---------------|----------------------------|---------|
+| `--auth-user` | Required username          | not set |
+| `--auth-pass` | Required password          | not set |
+| `--icons-dir` | Path to store cached icons | `<OS temp dir>/mitto-icons` |
 
 #### Server side only
 
-| Option          | Description | Default |
-|-----------------|-------------|---------|
+| Option            | Description | Default |
+|-------------------|-------------|---------|
 | `--key`           | Path to SSL key | not set |
 | `--cert`          | Path to SSL certificate | not set |
 | `--port`          | Port which the server runs on | `7331` |
@@ -70,10 +72,12 @@ But default values are also displayed below.
 | `--same-ip-only`  | Only return notifications made on the same external IP | not set |
 | `--rate-limit`    | Request count before you get rate limited | `100` |
 | `--rate-duration` | How long does the rate limit last, in seconds | `60` |
+| `--proxy-icons`   | Should icons be downloaded and proxied through the server  | `60` |
 
 #### Client side only
 
-| Option      | Description | Default |
-|-------------|-------------|---------|
+| Option        | Description | Default |
+|---------------|-------------|---------|
 | `--listen`    | Full URL to a Mitto instance | not set |
 | `--frequency` | How often should new notifications be checked for, in seconds | `3` |
+| `--icons`     | Enables icons in notification, use `--no-icons` to disable | enabled |

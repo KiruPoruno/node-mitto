@@ -13,10 +13,12 @@ const opts = require("minimist")(process.argv.slice(2), {
 		"rate-duration",
 	],
 	boolean: [
+		"icons",
 		"same-ip-only",
 		"x-forward-ip"
 	],
 	default: {
+		"icons": true,
 		"frequency": 3,
 		"alive-time": 10,
 		"rate-limit": 100,
@@ -25,11 +27,14 @@ const opts = require("minimist")(process.argv.slice(2), {
 	}
 });
 
+const icon = require("./icon");
+
 if (opts["help"]) {
 	console.log(`General
  --help            displays this message
  --auth-user       required user in auth header
  --auth-pass       required pass in auth header
+ --icons-dir       where to store cached icons
 
 Server side only
  --key             path to SSL key
@@ -39,16 +44,18 @@ Server side only
  --same-ip-only    only returns notifications on the same external IP
  --rate-limit      how many requests can be made before rate limiting
  --rate-duration   how long will the rate limit last
- --x-forward-ip
-                   enables the X-Forwarded-From header which may be
+ --x-forward-ip    enables the X-Forwarded-From header which may be
                    needed for proxies, as this can be overwritten by the
                    client, if not needed it should not be enabled, as a
                    client may pretend to have a different IP, allowing
                    them to see different notifications
+ --proxy-icons     should icons be downloaded and proxied to the client
 
 Client side only
  --listen          client side daemon
- --frequency       how to check for updates, in seconds`)
+ --frequency       how to check for updates, in seconds
+ --icons           enable icons in notifications, use --no-icons to
+                   disable the icons`)
 	process.exit(0);
 }
 
@@ -64,11 +71,22 @@ function parse_notifications(obj) {
 }
 
 let notifier = require("node-notifier");
-function notify(obj) {
+async function notify(obj) {
 	console.log("New notification");
+
 	let title = obj.title;
 	if (obj.app_name && obj.app_name != "") {
 		title = obj.app_name + " - " + title;
+	}
+
+	let md5 = (text) => {
+		let hmac = require("crypto").createHmac("md5", text);
+		return hmac.digest("hex");
+	}
+
+	if (obj.icon && opts["icons"]) {
+		let icon_path = md5(obj.icon);
+		obj.icon = await icon.download(icon_path, obj.icon);
 	}
 
 	notifier.notify({
@@ -167,7 +185,7 @@ let check_auth = (auth_header) => {
 	return false;
 }
 
-app.post("/new-notification", (req, res) => {
+app.post("/new-notification", async (req, res) => {
 	if (! check_auth(req.headers.authorization)) {
 		res.statusCode = 403;
 		return res.send();
@@ -177,19 +195,27 @@ app.post("/new-notification", (req, res) => {
 		icon: "",
 		text: "",
 		title: "",
+		app_id: "",
 		app_name: "",
 		sub_text: "",
 		sub_title: ""
 	, ...req.body};
 
 	let id = get_id();
+
+	let app_id_icon;
+	if (notification.app_id) {
+		app_id_icon = await icon.get(notification.app_id);
+	}
+
 	notifications[id] = {
-		icon: notification.icon,
 		text: notification.text,
 		title: notification.title,
+		app_id: notification.app_id,
 		app_name: notification.app_name,
 		sub_text: notification.sub_text,
 		sub_title: notification.sub_text,
+		icon: notification.icon || app_id_icon,
 	}
 
 	if (opts["same-ip-only"]) {
@@ -210,27 +236,60 @@ app.get("/notifications", (req, res) => {
 		return res.send();
 	}
 
+
+	let notifs = {...notifications};
+
+	for (let i in notifs) {
+		if (typeof notifs[i].icon !== "string") {
+			continue;
+		}
+
+		let app_id = notifs[i].icon.replace("local://", "");
+
+		notifs[i].icon = notifs[i].icon.replace(
+			"local://",
+
+			// as an example, this may end up being:
+			//   http://localhost:7331/icon/
+			//
+			// then the app ID is added at the end, due to only
+			// replacing the `local://` part, leaving the app ID
+			req.protocol + "://" + req.headers.host + "/icon/"
+		)
+	}
+
 	if (opts["same-ip-only"]) {
-		let new_notifications = {};
-		for (let i in notifications) {
-			if (notifications[i].ip == get_ip(req)) {
-				console.log(notifications[i].ip)
-				new_notifications[i] = {...notifications[i]};
-				delete new_notifications[i].ip;
+		let new_notifs = {};
+		for (let i in notifs) {
+			if (notifs[i].ip == get_ip(req)) {
+				new_notifs[i] = {...notifs[i]};
+				delete new_notifs[i].ip;
 			}
 		}
 
 		res.statusCode = 200;
-		return res.send(new_notifications);
+		return res.send(new_notifs);
 	}
 
 	res.statusCode = 200;
-	return res.send(notifications);
+	return res.send(notifs);
 })
 
 app.get("/status", (req, res) => {
 	res.statusCode = 200;
 	return res.send();
+})
+
+app.get("/icon/:app_id", async (req, res) => {
+	let app_id = req.params.app_id;
+	let file = await icon.get_file(app_id);
+
+	if (! file) {
+		res.statusCode = 404;
+		return res.send();
+	}
+
+	return res.sendFile(file);
 })
 
 let http = app;
@@ -242,7 +301,6 @@ if (opts["cert"] && opts["key"]) {
 		key: fs.readFileSync(opts["key"], "utf8"),
 		cert: fs.readFileSync(opts["cert"], "utf8")
 	}, app)
-} else {
 }
 
 http.listen(port, () => {
