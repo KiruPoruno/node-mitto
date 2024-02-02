@@ -73,6 +73,8 @@ But default values are also displayed below.
 | `--rate-limit`    | Request count before you get rate limited | `100` |
 | `--rate-duration` | How long does the rate limit last, in seconds | `60` |
 | `--proxy-icons`   | Should icons be downloaded and proxied through the server  | `60` |
+| `--https-icons`   | Forces proxied icons to be delivered over HTTPS | `60` |
+
 
 #### Client side only
 

@@ -14,6 +14,7 @@ const opts = require("minimist")(process.argv.slice(2), {
 	],
 	boolean: [
 		"icons",
+		"https-icons",
 		"same-ip-only",
 		"x-forward-ip"
 	],
@@ -23,6 +24,7 @@ const opts = require("minimist")(process.argv.slice(2), {
 		"alive-time": 10,
 		"rate-limit": 100,
 		"rate-duration": 60,
+		"https-icons": false,
 		"x-forward-ip": false
 	}
 });
@@ -50,6 +52,9 @@ Server side only
                    client may pretend to have a different IP, allowing
                    them to see different notifications
  --proxy-icons     should icons be downloaded and proxied to the client
+ --https-icons     forces proxied icons to be delivered over HTTPS, use
+				   this if the protocol auto detection is incorrectly
+				   using HTTP
 
 Client side only
  --listen          client side daemon
@@ -246,6 +251,14 @@ app.get("/notifications", (req, res) => {
 
 		let app_id = notifs[i].icon.replace("local://", "");
 
+		// auto detect the protocol
+		let protocol = req.protocol;
+
+		// force `protocol` to be HTTPS
+		if (opts["https-icons"]) {
+			protocol = "https"
+		}
+
 		notifs[i].icon = notifs[i].icon.replace(
 			"local://",
 
@@ -254,7 +267,7 @@ app.get("/notifications", (req, res) => {
 			//
 			// then the app ID is added at the end, due to only
 			// replacing the `local://` part, leaving the app ID
-			req.protocol + "://" + req.headers.host + "/icon/"
+			protocol + "://" + req.headers.host + "/icon/"
 		)
 	}
 
